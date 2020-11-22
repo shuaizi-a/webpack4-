@@ -25,7 +25,14 @@ module.exports = {
     // 自动打开浏览器
     open: true,
     // 开启热更新
-    hot: true
+    hot: true,
+    proxy:{
+      "/":{
+        target: "http://192.168.1.102:8888",
+        secure: false, // true表示https false表示http
+        changeOrigin: true // 把请求头当中的host值修改为服务器地址
+      }
+    }
   },
   plugins: [
     //创建一个内存
