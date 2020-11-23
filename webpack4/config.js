@@ -6,5 +6,4 @@
 module.exports = {
   'index': './src/index.js',
   "login/index": "./src/login/index.js",
-  "pink/index":''
 };

@@ -18,9 +18,9 @@ for (let [key, val] of Object.entries(urlList)) {
     })
   );
   
-  if (templateList[key]) {
+
     templateList[key] = val;
-  }
+  
 }
 
 // 配置多页面模板
