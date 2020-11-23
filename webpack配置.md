@@ -159,7 +159,7 @@ const {CleanWebpackPlugin} = require('clean-webpack-plugin')
 ```
 
 
-## 配置多入口打包编译
+## 配置多入口打包编译 (不把第三方类库打包到一起) 
 ```javascript
 const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
@@ -173,7 +173,7 @@ const htmlPlugins = ['index','login'].map(item =>{
       //指定生成的页面的名称 (相当于把模板页面的内容复制过来)
       filename: `${item}.html`,
       // 防止不同的页面生成其他页面的js
-      chunks: [item],
+      chunks: [item,'jquery'], // 1.谁在前面先加载谁
       hash: true,
     })
 })
@@ -186,6 +186,8 @@ module.exports = {
   entry: {
     index: './src/index.js',
     login: './src/login.js',
+    // 2.独立打包第三方类库
+    jquery:'jquery'
   },
   // 出口
   output: {
@@ -223,3 +225,194 @@ module.exports = {
   ],
 };
 ```
+
+## css处理 / less/sass / 字体图标 / html解析img标签url地址 / 图片
+> css-loader style-loader
+```javascript
+npm install css-loader style-loader -D // 处理css
+npm install css-loader style-loader less-loader -D // 处理less
+npm install css-loader style-loader sass-loader -D // 处理sass
+npm install file-loader url-loader -D // 处理图片和字体图标路径问题
+npm install html-loader -D // 处理html文件内的img标签src路径
+
+```
+```javascript
+module.exports = {
+  // 插件：加载顺序从右往左，从下往上
+  module: {
+    rules: [
+      // 处理css
+      {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader']
+      },
+      //配置处理 .less 文件的规则
+      {
+        test: /\.less$/, 
+        use:['style-loader','css-loader','less-loader'] 
+      }, 
+      //配置处理 .sass 文件的规则
+      {
+        test: /\.scss$/, 
+        use:['style-loader','css-loader','sass-loader'] 
+      }, 
+      // 处理图片
+      {
+        test: /\.(jpg|png|gif|bmp|jpeg)$/,
+        use: ['url-loader?limit=1063109&name=[hash:8]-[name].[ext]']
+      },
+      // 配置字体图标
+      {
+        test: /\.(ttf|eot|svg|woff|woff2)$/,
+        use: ['fild-loader']
+      },
+      // 配置html可以解析img标签里面src的图片地址
+      {
+        test: /\.html$/,
+        use: ['html-loader']
+      }
+    ]
+  }
+}
+```
+
+## 设置css兼容浏览器
+> npm install postcss-loader -D
+```javascript
+module.exports = {
+  // 加载器：加载顺序从右往左，从下往上
+  module: {
+    rules: [
+      // 处理css
+      {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader', 'postcss-loader'] //注意顺序
+      }
+    ]
+  }
+}
+```
+>根目录下创建 postcss.config.js文件
+```javascript
+module.exports = {
+  plugins: [
+       require('autoprefixer')
+    ]
+}
+```
+
+```javascript
+// package.json页面 
+"browserslist":[
+  ">0.1%", // 兼容99.99%的浏览器
+  "last 2 versions"
+]
+```
+
+## mini-css-extract-plugin(css分离插件)
+```javascript
+npm install -D mini-css-extract-plugin
+
+// 使用
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+module.exports = {
+  // 插件
+  plugins: [
+
+    // 重点
+    new MiniCssExtractPlugin({
+      // 类似 webpackOptions.output里面的配置 可以忽略
+      filename: "[name].[hash].css",
+    }),
+  ],
+  // 加载器
+  module: {
+    rules: [
+      // 处理css
+      {
+        test: /\.css$/,
+        use: [
+          // 重点代替style-loader
+          MiniCssExtractPlugin.loader,
+          // "style-loader",
+          "css-loader",
+        ],
+      },
+    ],
+  },
+};
+```
+
+## 压缩js/css
+> npm install optimize-css-assets-webpack-plugin terser-webpack-plugin uglifyjs-webpack-plugin -D
+```javascript
+const OptimizeCssAssetsWebpackPlugin = require('optimize-css-assets-webpack-plugin');
+const TerserPlugin = require('terser-webpack-plugin');
+const uglifyjsWebpackPlugin = require('uglifyjs-webpack-plugin');
+
+module.exports = {
+  // 设置优化项
+  optimization: {
+    // 设置压缩方式
+    minimizer: [
+      // 压缩css(必须指定js的压缩方式)
+      new OptimizeCssAssetsWebpackPlugin(),
+      // 压缩js
+      // new uglifyjsWebpackPlugin({
+      //   cache: true, // 是否使用缓存
+      //   parsllel: true, // 是否是并发编译
+      //   sourceMap: true // 启动源码映射(方便调试)
+      // }),
+
+      new TerserPlugin()
+    ]
+  }
+}
+```
+
+## js处理
+>npm install babel-loader @babel/core @babel/preset-env -D
+
+>npm install @babel/runtime @babel/polyfill 安装在生产依赖
+
+>npm install @babel/plugin-transform-runtime -D
+```javascript
+module.exports = {
+  // 加载器
+  module: {
+    rules: [
+      {
+        test:'/\.js$/',
+        use:[{
+          loader: 'babel-loader',
+          options: {
+            // 转换语法阶段
+            presets:[
+              "@babel/preset-env"
+            ],
+            // 基于插件处理ES6/ES7中的CLASS语法
+            plugins: [
+              ["@babel/plugin-proposal-decorators",{
+                "legacy":true
+              }],
+              ["@babel/plugin-proposal-class-properties",{
+                "loose": true
+              }],
+              "@babel/plugin-transform-runtime"
+            ]
+          }
+        }],
+        //  设置编译时忽略的目录
+        inclide: path.resolve(__dirname, 'src'),
+        exclude: /node_modules/
+      }
+    ]  
+  }
+};
+```
+
+>@babel/polyfill 和其他的webpack插件是不一样的
+```javascript
+
+```
+       
